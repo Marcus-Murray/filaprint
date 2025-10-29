@@ -6,18 +6,8 @@
         "@filaprint/mcp-documentation"
       ],
       "env": {
-        "API_DOCS_PATH": "docs/api",
-        "README_PATH": "README.md"
-      }
-    },
-    "deployment": {
-      "command": "npx",
-      "args": [
-        "@filaprint/mcp-deployment"
-      ],
-      "env": {
-        "CI_CONFIG": ".github/workflows",
-        "DEPLOY_ENV": "staging"
+        "README_PATH": "README.md",
+        "API_DOCS_PATH": "docs/api"
       }
     },
     "code-quality": {
@@ -26,18 +16,8 @@
         "@filaprint/mcp-code-quality"
       ],
       "env": {
-        "ESLINT_CONFIG": ".eslintrc.json",
-        "PRETTIER_CONFIG": ".prettierrc"
-      }
-    },
-    "testing": {
-      "command": "npx",
-      "args": [
-        "@filaprint/mcp-testing"
-      ],
-      "env": {
-        "COVERAGE_THRESHOLD": "80",
-        "TEST_CONFIG": "jest.config.js"
+        "PRETTIER_CONFIG": ".prettierrc",
+        "ESLINT_CONFIG": ".eslintrc.json"
       }
     },
     "security-compliance": {
@@ -48,6 +28,26 @@
       "env": {
         "LOG_LEVEL": "info",
         "NODE_ENV": "development"
+      }
+    },
+    "testing": {
+      "command": "npx",
+      "args": [
+        "@filaprint/mcp-testing"
+      ],
+      "env": {
+        "TEST_CONFIG": "jest.config.js",
+        "COVERAGE_THRESHOLD": "80"
+      }
+    },
+    "deployment": {
+      "command": "npx",
+      "args": [
+        "@filaprint/mcp-deployment"
+      ],
+      "env": {
+        "DEPLOY_ENV": "staging",
+        "CI_CONFIG": ".github/workflows"
       }
     }
   }
