@@ -1,0 +1,54 @@
+{
+  "mcpServers": {
+    "documentation": {
+      "command": "npx",
+      "args": [
+        "@filaprint/mcp-documentation"
+      ],
+      "env": {
+        "API_DOCS_PATH": "docs/api",
+        "README_PATH": "README.md"
+      }
+    },
+    "deployment": {
+      "command": "npx",
+      "args": [
+        "@filaprint/mcp-deployment"
+      ],
+      "env": {
+        "CI_CONFIG": ".github/workflows",
+        "DEPLOY_ENV": "staging"
+      }
+    },
+    "code-quality": {
+      "command": "npx",
+      "args": [
+        "@filaprint/mcp-code-quality"
+      ],
+      "env": {
+        "ESLINT_CONFIG": ".eslintrc.json",
+        "PRETTIER_CONFIG": ".prettierrc"
+      }
+    },
+    "testing": {
+      "command": "npx",
+      "args": [
+        "@filaprint/mcp-testing"
+      ],
+      "env": {
+        "COVERAGE_THRESHOLD": "80",
+        "TEST_CONFIG": "jest.config.js"
+      }
+    },
+    "security-compliance": {
+      "command": "npx",
+      "args": [
+        "@filaprint/mcp-security-compliance"
+      ],
+      "env": {
+        "LOG_LEVEL": "info",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
