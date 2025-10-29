@@ -1,0 +1,24 @@
+{
+  "name": "@filaprint/mcp-documentation",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Documentation MCP server - API docs, README, JSDoc validation",
+  "main": "dist/index.js",
+  "bin": {
+    "mcp-documentation": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.24",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
+

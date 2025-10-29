@@ -1,0 +1,65 @@
+# FilaPrint Cursor Rules
+# Based on cursor.directory/rules and best practices
+
+## TypeScript & Code Quality
+- Use TypeScript strict mode
+- No `any` types - use proper types or `unknown`
+- Maximum function complexity: 10
+- Maximum file length: 200 lines
+- Use camelCase for variables/functions, PascalCase for classes
+- Always use const/let, never var
+
+## Security Rules
+- Validate all inputs with Zod schemas
+- Use parameterized queries (no SQL injection)
+- Hash passwords with bcrypt
+- Use JWT for authentication
+- Never commit secrets (.env files)
+- Use Helmet for security headers
+- Implement rate limiting
+- Sanitize user inputs to prevent XSS
+
+## React Best Practices
+- Use functional components with hooks
+- Extract complex logic into custom hooks
+- Memoize expensive computations
+- Use proper dependency arrays in useEffect
+- Handle loading and error states
+- Use TypeScript for props
+
+## Backend Best Practices
+- Use async/await (avoid callbacks)
+- Handle errors with try-catch
+- Use middleware for cross-cutting concerns
+- Validate request data
+- Log important events
+- Use environment variables for config
+
+## Testing
+- Maintain 80%+ code coverage
+- Write unit tests for all functions
+- Write integration tests for APIs
+- Use Playwright for E2E tests
+- Test error cases
+
+## Documentation
+- Document all public APIs with JSDoc
+- Keep README up to date
+- Document complex algorithms
+- Include examples in docs
+
+## Accessibility
+- Use semantic HTML
+- Include ARIA labels where needed
+- Ensure keyboard navigation works
+- Test with screen readers
+- Maintain proper color contrast
+
+## Performance
+- Lazy load components
+- Optimize images
+- Minimize bundle size
+- Use code splitting
+- Cache API responses appropriately
+
+

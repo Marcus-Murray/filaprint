@@ -1,0 +1,24 @@
+{
+  "name": "@filaprint/mcp-code-quality",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Code quality MCP server - ESLint, Prettier, TypeScript, complexity analysis",
+  "main": "dist/index.js",
+  "bin": {
+    "mcp-code-quality": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.24",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
+
