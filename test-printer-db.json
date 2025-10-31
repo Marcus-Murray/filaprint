@@ -1,0 +1,17 @@
+{
+  "name": "Test H2D Database",
+  "model": "Bambu Labs H2D",
+  "serialNumber": "DBTEST123456",
+  "ipAddress": "192.168.1.101",
+  "accessCode": "123456",
+  "description": "Test printer for database integration",
+  "mqttConfig": {
+    "host": "192.168.1.101",
+    "port": 8883,
+    "username": "bblp",
+    "password": "123456",
+    "serialNumber": "DBTEST123456"
+  }
+}
+
+

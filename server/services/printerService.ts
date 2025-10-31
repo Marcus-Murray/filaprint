@@ -1,7 +1,7 @@
 import { createLogger } from '../utils/logger.js';
 import { logDatabaseOperation } from '../middleware/auditLogger.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
-import { bambuMQTTService, BambuMQTTConfig } from './mqttService.js';
+import { bambuMQTTService, BambuMQTTConfig, H2DLiveData } from './mqttService.js';
 import { liveDataService } from './liveDataService.js';
 import { PrinterDB, LiveDataDB } from '../database/services.js';
 import type {
@@ -9,6 +9,7 @@ import type {
   NewPrinter,
   LiveData as LiveDataType,
 } from '../database/schema.js';
+import type { Request as ExpressRequest } from 'express';
 
 const logger = createLogger('printer-service');
 
@@ -33,7 +34,7 @@ export interface PrinterStatus {
   serialNumber: string;
   connectionStatus: 'connected' | 'disconnected' | 'error' | 'connecting';
   lastSeen: string;
-  liveData: any; // Will be H2DLiveData when available
+  liveData: H2DLiveData | null; // Live data from MQTT
   error?: string;
 }
 
@@ -50,7 +51,7 @@ export class PrinterService {
   /**
    * Add a new printer
    */
-  async addPrinter(config: PrinterConfig, req?: any): Promise<Printer> {
+  async addPrinter(config: PrinterConfig, req?: Express.Request): Promise<Printer> {
     try {
       logger.info('Adding new printer', {
         name: config.name,
@@ -134,7 +135,7 @@ export class PrinterService {
   /**
    * Remove a printer
    */
-  async removePrinter(printerId: string, req?: any): Promise<void> {
+  async removePrinter(printerId: string, req?: Express.Request): Promise<void> {
     try {
       logger.info('Removing printer', { printerId });
 
@@ -154,6 +155,65 @@ export class PrinterService {
     } catch (error) {
       logger.error('Failed to remove printer', { error, printerId });
       throw error;
+    }
+  }
+
+  /**
+   * Load all printers on startup and attempt to connect them
+   */
+  async loadPrintersOnStartup(): Promise<void> {
+    try {
+      logger.info('Loading printers on startup...');
+      const printers = await PrinterDB.findAll();
+
+      logger.info(`Found ${printers.length} printer(s) to load`);
+
+      // Initialize status for each printer
+      for (const printer of printers) {
+        const status: PrinterStatus = {
+          id: printer.id,
+          name: printer.name,
+          model: printer.model,
+          serialNumber: printer.serialNumber,
+          connectionStatus: 'disconnected',
+          lastSeen: new Date().toISOString(),
+          liveData: null,
+        };
+        this.printerStatuses.set(printer.id, status);
+      }
+
+      // Attempt to auto-connect all printers
+      // Note: We'll try to connect, but failures are non-fatal
+      const connectPromises = printers.map(async (printer) => {
+        try {
+          logger.info(`Attempting to auto-connect printer: ${printer.name} (${printer.id})`);
+          await this.connectPrinter(printer.id);
+          logger.info(`Successfully auto-connected printer: ${printer.name}`);
+        } catch (error) {
+          logger.warn(`Failed to auto-connect printer ${printer.name}:`, {
+            error: error instanceof Error ? error.message : error,
+            printerId: printer.id,
+          });
+          // Update status to error but don't throw
+          const status = this.printerStatuses.get(printer.id);
+          if (status) {
+            status.connectionStatus = 'error';
+            status.error = error instanceof Error ? error.message : 'Connection failed';
+            this.printerStatuses.set(printer.id, status);
+          }
+        }
+      });
+
+      await Promise.allSettled(connectPromises);
+
+      const connectedCount = Array.from(this.printerStatuses.values()).filter(
+        (s) => s.connectionStatus === 'connected'
+      ).length;
+
+      logger.info(`Startup complete: ${connectedCount}/${printers.length} printer(s) connected`);
+    } catch (error) {
+      logger.error('Failed to load printers on startup', { error });
+      // Don't throw - we want the server to start even if this fails
     }
   }
 
@@ -191,7 +251,7 @@ export class PrinterService {
   async updatePrinter(
     printerId: string,
     updates: Partial<PrinterConfig>,
-    req?: any
+    req?: ExpressRequest
   ): Promise<Printer> {
     try {
       logger.info('Updating printer', {
@@ -356,6 +416,7 @@ export class PrinterService {
   /**
    * Get printer status
    * Creates a default status if one doesn't exist (for newly added printers)
+   * Includes latest live data if available
    */
   async getPrinterStatus(printerId: string): Promise<PrinterStatus | null> {
     let status = this.printerStatuses.get(printerId);
@@ -382,14 +443,58 @@ export class PrinterService {
       }
     }
 
+    // If printer is connected, try to get latest live data
+    if (status && status.connectionStatus === 'connected') {
+      try {
+        const printer = await PrinterDB.findById(printerId);
+        if (printer) {
+          const liveData = await liveDataService.getCurrentLiveData(printer.serialNumber);
+          if (liveData) {
+            status.liveData = liveData;
+            status.lastSeen = liveData.timestamp || status.lastSeen;
+          }
+        }
+      } catch (error) {
+        logger.debug('Failed to fetch live data for status', { error, printerId });
+        // Don't throw - status is still valid without live data
+      }
+    }
+
     return status || null;
   }
 
   /**
-   * Get all printer statuses
+   * Get all printer statuses with live data
    */
-  getAllPrinterStatuses(): PrinterStatus[] {
-    return Array.from(this.printerStatuses.values());
+  async getAllPrinterStatuses(): Promise<PrinterStatus[]> {
+    const statuses = Array.from(this.printerStatuses.values());
+
+    // For each connected printer, try to fetch latest live data
+    const statusesWithLiveData = await Promise.all(
+      statuses.map(async (status) => {
+        if (status.connectionStatus === 'connected') {
+          try {
+            const printer = await PrinterDB.findById(status.id);
+            if (printer) {
+              const liveData = await liveDataService.getCurrentLiveData(printer.serialNumber);
+              if (liveData) {
+                return {
+                  ...status,
+                  liveData,
+                  lastSeen: liveData.timestamp || status.lastSeen,
+                };
+              }
+            }
+          } catch (error) {
+            logger.debug('Failed to fetch live data for status', { error, printerId: status.id });
+            // Return status without live data update
+          }
+        }
+        return status;
+      })
+    );
+
+    return statusesWithLiveData;
   }
 
   /**
@@ -447,7 +552,7 @@ export class PrinterService {
       }
 
       // Get live data from service
-      const liveData = liveDataService.getCurrentLiveData(printer.serialNumber);
+      const liveData = await liveDataService.getCurrentLiveData(printer.serialNumber);
 
       // Store in database for historical tracking
       if (liveData) {
@@ -494,51 +599,80 @@ export class PrinterService {
 
   /**
    * Setup MQTT event handlers
+   * This is called once in constructor to register the handler for all printers
    */
   private setupMQTTEventHandlers(): void {
-    // Handle live data updates
-    // bambuMQTTService.onLiveData((serialNumber, data) => {
-    // Find printer by serial number
-    // this.findPrinterBySerialNumber(serialNumber).then(printer => {
-    //   if (printer) {
-    //     // Update live data in service
-    //     liveDataService.storeLiveData(serialNumber, data);
-    //     // Update printer status
-    //     const status = this.printerStatuses.get(printer.id);
-    //     if (status) {
-    //       status.liveData = data;
-    //       status.lastSeen = new Date().toISOString();
-    //       this.printerStatuses.set(printer.id, status);
-    //       // Notify connection handlers
-    //       const handler = this.connectionHandlers.get(printer.id);
-    //       if (handler) {
-    //         handler(status);
-    //       }
-    //     }
-    //   }
-    // });
-    // });
-    // Handle connection status changes
-    // bambuMQTTService.onConnectionStatus((serialNumber, isConnected) => {
-    // this.findPrinterBySerialNumber(serialNumber).then(printer => {
-    //   if (printer) {
-    //     const status = this.printerStatuses.get(printer.id);
-    //     if (status) {
-    //       status.connectionStatus = isConnected
-    //         ? 'connected'
-    //         : 'disconnected';
-    //       status.lastSeen = new Date().toISOString();
-    //       this.printerStatuses.set(printer.id, status);
-    //       // Notify connection handlers
-    //       const handler = this.connectionHandlers.get(printer.id);
-    //       if (handler) {
-    //         handler(status);
-    //       }
-    //     }
-    //   }
-    // });
-    // });
+    // Register handler for live data updates (only once)
+    // The handler ID must be unique - use a constant to avoid duplicate registrations
+    const handlerId = 'printerService';
+
+    // Check if handler already exists to avoid duplicate registrations
+    if (this.messageHandlerRegistered) {
+      logger.debug('MQTT message handler already registered');
+      return;
+    }
+
+      bambuMQTTService.onMessage(handlerId, async (liveData: H2DLiveData) => {
+      try {
+        logger.debug('Received live data from MQTT', {
+          printerId: liveData.printerId,
+          timestamp: liveData.timestamp,
+          status: liveData.status?.status,
+        });
+
+        // Store live data in the service (uses serialNumber as printerId)
+        await liveDataService.storeLiveData(liveData);
+
+        // Find printer by serial number (liveData.printerId is the serialNumber)
+        const printer = await this.findPrinterBySerialNumber(liveData.printerId);
+
+        if (printer) {
+          logger.debug('Found printer for live data update', {
+            printerId: printer.id,
+            serialNumber: printer.serialNumber,
+          });
+
+          // Update printer status with live data
+          const status = this.printerStatuses.get(printer.id);
+          if (status) {
+            status.liveData = liveData;
+            status.lastSeen = liveData.timestamp || new Date().toISOString();
+            this.printerStatuses.set(printer.id, status);
+
+            logger.debug('Updated printer status with live data', {
+              printerId: printer.id,
+              hasLiveData: !!liveData,
+            });
+
+            // Notify connection handlers
+            const handler = this.connectionHandlers.get(printer.id);
+            if (handler) {
+              handler(status);
+            }
+          } else {
+            logger.warn('No printer status found for printer', {
+              printerId: printer.id,
+              serialNumber: printer.serialNumber,
+            });
+          }
+        } else {
+          logger.warn('No printer found for serial number', {
+            serialNumber: liveData.printerId,
+          });
+        }
+      } catch (error) {
+        logger.error('Error handling live data update', {
+          error,
+          printerId: liveData.printerId,
+        });
+      }
+    });
+
+    this.messageHandlerRegistered = true;
+    logger.info('MQTT message handler registered for printerService');
   }
+
+  private messageHandlerRegistered = false;
 
   /**
    * Find printer by serial number

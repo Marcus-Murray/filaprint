@@ -1,0 +1,73 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# FilaPrint Commit Message Hook
+# This hook enforces conventional commit message format
+
+commit_regex='^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\(.+\))?: .{1,50}'
+
+if ! grep -qE "$commit_regex" "$1"; then
+    echo "❌ Invalid commit message format!"
+    echo ""
+    echo "Commit message must follow conventional commit format:"
+    echo "  <type>(<scope>): <description>"
+    echo ""
+    echo "Types:"
+    echo "  feat     - A new feature"
+    echo "  fix      - A bug fix"
+    echo "  docs     - Documentation only changes"
+    echo "  style    - Changes that do not affect the meaning of the code"
+    echo "  refactor - A code change that neither fixes a bug nor adds a feature"
+    echo "  perf     - A code change that improves performance"
+    echo "  test     - Adding missing tests or correcting existing tests"
+    echo "  chore    - Changes to the build process or auxiliary tools"
+    echo "  ci       - Changes to CI configuration files and scripts"
+    echo "  build    - Changes that affect the build system or external dependencies"
+    echo "  revert   - Reverts a previous commit"
+    echo ""
+    echo "Examples:"
+    echo "  feat(auth): add JWT authentication"
+    echo "  fix(mqtt): resolve connection timeout issue"
+    echo "  docs(api): update OpenAPI specification"
+    echo "  test(printer): add unit tests for H2D connection"
+    echo ""
+    echo "Your commit message:"
+    echo "  $(cat "$1")"
+    echo ""
+    exit 1
+fi
+
+# Check for security-related commits
+if grep -qiE "(password|secret|key|token|auth)" "$1"; then
+    echo "⚠️ Security-related commit detected!"
+    echo "Please ensure no sensitive information is included in the commit message."
+    echo "Consider using generic terms like 'authentication' or 'credentials'."
+    echo ""
+    read -p "Continue anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Commit rejected."
+        exit 1
+    fi
+fi
+
+# Check for breaking changes
+if grep -qiE "(breaking|break)" "$1"; then
+    echo "⚠️ Breaking change detected!"
+    echo "Please ensure the commit message includes 'BREAKING CHANGE:' in the body."
+    echo "Example:"
+    echo "  feat(api): change authentication method"
+    echo ""
+    echo "  BREAKING CHANGE: JWT tokens now expire after 1 hour instead of 24 hours"
+    echo ""
+    read -p "Continue anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Commit rejected."
+        exit 1
+    fi
+fi
+
+echo "✅ Commit message format is valid!"
+
+

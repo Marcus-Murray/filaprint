@@ -43,6 +43,34 @@ export interface JwtPayload {
 export class AuthService {
   // Configuration
   private readonly saltRounds = 12;
+
+  /**
+   * Get JWT secret - throws if not set (enterprise-grade security)
+   */
+  private getJwtSecret(): string {
+    const secret = process.env['JWT_SECRET'];
+    if (!secret || secret.trim() === '' || secret === 'fallback-secret') {
+      throw new Error(
+        'JWT_SECRET environment variable is required and cannot be empty or use fallback value. ' +
+        'Please set a secure secret in your environment variables.'
+      );
+    }
+    return secret;
+  }
+
+  /**
+   * Get JWT refresh secret - throws if not set (enterprise-grade security)
+   */
+  private getJwtRefreshSecret(): string {
+    const secret = process.env['JWT_REFRESH_SECRET'] || process.env['JWT_SECRET'];
+    if (!secret || secret.trim() === '' || secret === 'fallback-secret') {
+      throw new Error(
+        'JWT_REFRESH_SECRET (or JWT_SECRET) environment variable is required and cannot be empty or use fallback value. ' +
+        'Please set a secure secret in your environment variables.'
+      );
+    }
+    return secret;
+  };
   private readonly accessTokenExpiry = '15m';
   private readonly refreshTokenExpiry = '7d';
   private readonly maxFailedAttempts = 5;
@@ -70,7 +98,7 @@ export class AuthService {
    */
   async register(
     userData: CreateUserData,
-    req?: any
+    req?: ExpressRequest
   ): Promise<{ user: Omit<User, 'passwordHash'>; tokens: AuthTokens }> {
     try {
       logger.info('User registration attempt', {
@@ -156,7 +184,7 @@ export class AuthService {
    */
   async login(
     credentials: LoginCredentials,
-    req?: any
+    req?: ExpressRequest
   ): Promise<{ user: Omit<User, 'passwordHash'>; tokens: AuthTokens }> {
     try {
       logger.info('User login attempt', { username: credentials.username });
@@ -250,14 +278,14 @@ export class AuthService {
   /**
    * Refresh access token
    */
-  async refreshToken(refreshToken: string, req?: any): Promise<AuthTokens> {
+  async refreshToken(refreshToken: string, req?: Express.Request): Promise<AuthTokens> {
     try {
       logger.info('Token refresh attempt');
 
       // Verify refresh token
       const decoded = jwt.verify(
         refreshToken,
-        process.env['JWT_SECRET'] || 'fallback-secret'
+        this.getJwtRefreshSecret()
       ) as JwtPayload;
 
       // Check if refresh token exists in database
@@ -308,7 +336,7 @@ export class AuthService {
   /**
    * Logout user
    */
-  async logout(refreshToken: string, req?: any): Promise<void> {
+  async logout(refreshToken: string, req?: Express.Request): Promise<void> {
     try {
       logger.info('User logout attempt');
 
@@ -334,7 +362,7 @@ export class AuthService {
     try {
       const decoded = jwt.verify(
         token,
-        process.env['JWT_SECRET'] || 'fallback-secret'
+        this.getJwtSecret()
       ) as JwtPayload;
 
       // Check if user still exists and is active
@@ -363,13 +391,42 @@ export class AuthService {
     userId: string
   ): Promise<Omit<User, 'passwordHash'> | null> {
     try {
+      if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+        logger.warn('Invalid userId provided to getUserById', { userId });
+        throw new CustomError(
+          'Invalid user ID',
+          400,
+          'INVALID_USER_ID'
+        );
+      }
+
       const user = await UserDB.findById(userId);
-      if (!user) return null;
+      if (!user) {
+        logger.warn('User not found', { userId });
+        return null;
+      }
+
+      if (!user.isActive) {
+        logger.warn('User is inactive', { userId });
+        throw new CustomError(
+          'User account is inactive',
+          403,
+          'USER_INACTIVE'
+        );
+      }
 
       const { passwordHash: _, ...userWithoutPassword } = user;
       return userWithoutPassword;
     } catch (error) {
-      logger.error('Failed to get user by ID', { error, userId });
+      // If it's already a CustomError, re-throw it
+      if (error instanceof CustomError) {
+        throw error;
+      }
+      logger.error('Failed to get user by ID', {
+        error: error instanceof Error ? error.message : error,
+        errorStack: error instanceof Error ? error.stack : undefined,
+        userId
+      });
       throw new CustomError(
         'Failed to retrieve user',
         500,
@@ -387,7 +444,7 @@ export class AuthService {
     userId: string,
     currentPassword: string,
     newPassword: string,
-    req?: any
+    req?: ExpressRequest
   ): Promise<void> {
     try {
       const user = await UserDB.findById(userId);
@@ -430,7 +487,8 @@ export class AuthService {
    * Generate JWT tokens
    */
   private async generateTokens(user: User): Promise<AuthTokens> {
-    const jwtSecret = process.env['JWT_SECRET'] || 'fallback-secret';
+    const jwtSecret = this.getJwtSecret();
+    const jwtRefreshSecret = this.getJwtRefreshSecret();
 
     // Create payload
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
@@ -446,7 +504,7 @@ export class AuthService {
     });
 
     // Generate refresh token
-    const refreshToken = jwt.sign(payload, jwtSecret, {
+    const refreshToken = jwt.sign(payload, jwtRefreshSecret, {
       expiresIn: this.refreshTokenExpiry,
     });
 
@@ -641,7 +699,7 @@ export class AuthService {
   async updateUserRole(
     userId: string,
     newRole: 'admin' | 'user',
-    req?: any
+    req?: ExpressRequest
   ): Promise<void> {
     const user = await UserDB.findById(userId);
     if (!user) {
@@ -662,7 +720,7 @@ export class AuthService {
   /**
    * Deactivate user (admin only)
    */
-  async deactivateUser(userId: string, req?: any): Promise<void> {
+  async deactivateUser(userId: string, req?: Express.Request): Promise<void> {
     const user = await UserDB.findById(userId);
     if (!user) {
       throw new CustomError('User not found', 404, 'USER_NOT_FOUND');

@@ -53,7 +53,7 @@ router.get(
   '/statuses',
   authenticate,
   asyncHandler(async (req, res) => {
-    const statuses = printerService.getAllPrinterStatuses();
+    const statuses = await printerService.getAllPrinterStatuses();
     res.json({ success: true, data: statuses, count: statuses.length });
   })
 );

@@ -1,0 +1,130 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# FilaPrint Pre-commit Hook
+# This hook runs security scans, code quality checks, and tests before each commit
+
+echo "🚀 Running pre-commit checks..."
+
+# Run security scan
+echo "🛡️ Running security scan..."
+npm run security:scan
+if [ $? -ne 0 ]; then
+  echo "❌ Security scan failed. Commit rejected."
+  exit 1
+fi
+
+# Run code quality checks
+echo "🔧 Running code quality checks..."
+npm run quality:check
+if [ $? -ne 0 ]; then
+  echo "❌ Code quality checks failed. Commit rejected."
+  exit 1
+fi
+
+# Run unit tests
+echo "🧪 Running unit tests..."
+npm run test:unit
+if [ $? -ne 0 ]; then
+  echo "❌ Unit tests failed. Commit rejected."
+  exit 1
+fi
+
+# Check code coverage
+echo "📊 Checking code coverage..."
+npm run test:coverage
+if [ $? -ne 0 ]; then
+  echo "❌ Code coverage below threshold. Commit rejected."
+  exit 1
+fi
+
+# Run linting
+echo "🔍 Running ESLint..."
+npx eslint . --ext .ts,.tsx --config .eslintrc.json
+if [ $? -ne 0 ]; then
+  echo "❌ ESLint checks failed. Commit rejected."
+  exit 1
+fi
+
+# Run Prettier formatting check
+echo "💅 Checking code formatting..."
+npx prettier --check .
+if [ $? -ne 0 ]; then
+  echo "❌ Code formatting check failed. Run 'npm run format' to fix."
+  exit 1
+fi
+
+# TypeScript type checking
+echo "🔍 Running TypeScript type checking..."
+npx tsc --noEmit
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript type checking failed. Commit rejected."
+  exit 1
+fi
+
+# Check for secrets in code
+echo "🔐 Checking for secrets in code..."
+if grep -r "password\|secret\|key\|token" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" . | grep -v "node_modules" | grep -v ".git" | grep -v "test" | grep -v "spec"; then
+  echo "❌ Potential secrets found in code. Commit rejected."
+  exit 1
+fi
+
+# Check file sizes
+echo "📏 Checking file sizes..."
+find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" | grep -v node_modules | grep -v .git | xargs wc -l | awk '$1 > 500 {print "❌ File too large: " $2 " (" $1 " lines)"; exit 1}'
+if [ $? -ne 0 ]; then
+  echo "❌ Some files are too large. Commit rejected."
+  exit 1
+fi
+
+# Check for TODO/FIXME comments
+echo "📝 Checking for TODO/FIXME comments..."
+if grep -r "TODO\|FIXME\|HACK\|XXX" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" . | grep -v "node_modules" | grep -v ".git" | grep -v "test" | grep -v "spec"; then
+  echo "⚠️ TODO/FIXME comments found. Please address before committing."
+  read -p "Continue anyway? (y/N): " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "❌ Commit rejected due to TODO/FIXME comments."
+    exit 1
+  fi
+fi
+
+# Check for console.log statements
+echo "🔍 Checking for console.log statements..."
+if grep -r "console\.log\|console\.warn\|console\.error" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" . | grep -v "node_modules" | grep -v ".git" | grep -v "test" | grep -v "spec"; then
+  echo "⚠️ Console statements found. Please remove before committing."
+  read -p "Continue anyway? (y/N): " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "❌ Commit rejected due to console statements."
+    exit 1
+  fi
+fi
+
+# Check for debugger statements
+echo "🔍 Checking for debugger statements..."
+if grep -r "debugger" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" . | grep -v "node_modules" | grep -v ".git" | grep -v "test" | grep -v "spec"; then
+  echo "❌ Debugger statements found. Commit rejected."
+  exit 1
+fi
+
+# Check for unused imports
+echo "🔍 Checking for unused imports..."
+npx eslint . --ext .ts,.tsx --rule "@typescript-eslint/no-unused-vars: error"
+if [ $? -ne 0 ]; then
+  echo "❌ Unused imports found. Commit rejected."
+  exit 1
+fi
+
+# Check for any remaining issues
+echo "🔍 Final checks..."
+npm run lint:fix
+if [ $? -ne 0 ]; then
+  echo "❌ Linting fixes failed. Commit rejected."
+  exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"
+echo "🎉 Ready to commit!"
+
+

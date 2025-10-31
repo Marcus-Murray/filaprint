@@ -1,54 +1,304 @@
 {
   "mcpServers": {
-    "documentation": {
+    "security-compliance": {
       "command": "npx",
-      "args": [
-        "@filaprint/mcp-documentation"
-      ],
+      "args": ["@filaprint/mcp-security-compliance"],
       "env": {
-        "README_PATH": "README.md",
-        "API_DOCS_PATH": "docs/api"
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "info",
+        "SECURITY_CONFIG": ".security/config.json",
+        "OWASP_RULES": ".security/owasp-rules.json",
+        "GDPR_CONFIG": ".security/gdpr-config.json",
+        "SOC2_CONFIG": ".security/soc2-config.json",
+        "ISO27001_CONFIG": ".security/iso27001-config.json",
+        "NIST_CONFIG": ".security/nist-config.json"
       }
     },
     "code-quality": {
       "command": "npx",
-      "args": [
-        "@filaprint/mcp-code-quality"
-      ],
+      "args": ["@filaprint/mcp-code-quality"],
       "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "info",
+        "ESLINT_CONFIG": ".eslintrc.json",
         "PRETTIER_CONFIG": ".prettierrc",
-        "ESLINT_CONFIG": ".eslintrc.json"
+        "TSCONFIG": "tsconfig.json",
+        "SONAR_CONFIG": "sonar-project.properties",
+        "COVERAGE_THRESHOLD": "80",
+        "COMPLEXITY_THRESHOLD": "10"
       }
     },
-    "security-compliance": {
+    "documentation": {
       "command": "npx",
-      "args": [
-        "@filaprint/mcp-security-compliance"
-      ],
+      "args": ["@filaprint/mcp-documentation"],
       "env": {
+        "NODE_ENV": "development",
         "LOG_LEVEL": "info",
-        "NODE_ENV": "development"
+        "API_DOCS_PATH": "docs/api",
+        "README_PATH": "README.md",
+        "ARCHITECTURE_PATH": "docs/architecture",
+        "USER_GUIDES_PATH": "docs/user-guides",
+        "OPENAPI_SPEC": "docs/api/openapi.json",
+        "JSDOC_CONFIG": "jsdoc.config.json"
       }
     },
     "testing": {
       "command": "npx",
-      "args": [
-        "@filaprint/mcp-testing"
-      ],
+      "args": ["@filaprint/mcp-testing"],
       "env": {
-        "TEST_CONFIG": "jest.config.js",
-        "COVERAGE_THRESHOLD": "80"
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "info",
+        "JEST_CONFIG": "jest.config.js",
+        "PLAYWRIGHT_CONFIG": "playwright.config.ts",
+        "COVERAGE_THRESHOLD": "80",
+        "TEST_REPORTS_PATH": "test-reports",
+        "E2E_TIMEOUT": "30000",
+        "UNIT_TIMEOUT": "10000"
       }
     },
     "deployment": {
       "command": "npx",
-      "args": [
-        "@filaprint/mcp-deployment"
-      ],
+      "args": ["@filaprint/mcp-deployment"],
       "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "info",
+        "CI_CONFIG": ".github/workflows",
         "DEPLOY_ENV": "staging",
-        "CI_CONFIG": ".github/workflows"
+        "DOCKER_CONFIG": "docker",
+        "KUBERNETES_CONFIG": "k8s",
+        "MONITORING_CONFIG": "monitoring",
+        "ROLLBACK_ENABLED": "true"
       }
+    }
+  },
+  "rules": {
+    "security": {
+      "owasp": {
+        "injection": "Validate all inputs, use parameterized queries",
+        "brokenAuth": "Implement strong authentication, session management",
+        "sensitiveData": "Encrypt sensitive data, secure transmission",
+        "xmlExternal": "Disable XML external entity processing",
+        "brokenAccess": "Implement proper authorization controls",
+        "securityMisconfig": "Secure default configurations",
+        "xss": "Validate and escape all user inputs",
+        "insecureDeserialization": "Avoid deserializing untrusted data",
+        "knownVulns": "Keep dependencies updated, scan for vulnerabilities",
+        "logging": "Implement comprehensive logging and monitoring"
+      },
+      "gdpr": {
+        "dataMinimization": "Collect only necessary data",
+        "consent": "Obtain explicit user consent",
+        "rightToAccess": "Provide data access mechanisms",
+        "rightToErasure": "Implement data deletion capabilities",
+        "dataPortability": "Enable data export functionality",
+        "privacyByDesign": "Implement privacy by design principles"
+      },
+      "soc2": {
+        "security": "Implement security controls and monitoring",
+        "availability": "Ensure system availability and performance",
+        "processing": "Validate data processing integrity",
+        "confidentiality": "Protect confidential information",
+        "privacy": "Implement privacy controls and procedures"
+      },
+      "iso27001": {
+        "informationSecurity": "Implement information security management",
+        "riskManagement": "Conduct regular risk assessments",
+        "accessControl": "Implement proper access controls",
+        "cryptography": "Use appropriate cryptographic controls",
+        "incidentManagement": "Implement incident response procedures"
+      },
+      "nist": {
+        "identify": "Identify and manage cybersecurity risks",
+        "protect": "Implement protective safeguards",
+        "detect": "Detect cybersecurity events",
+        "respond": "Respond to detected cybersecurity events",
+        "recover": "Recover from cybersecurity events"
+      }
+    },
+    "codeQuality": {
+      "typescript": {
+        "strict": true,
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "exactOptionalPropertyTypes": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "noPropertyAccessFromIndexSignature": true,
+        "noUncheckedSideEffectImports": true
+      },
+      "eslint": {
+        "security": [
+          "no-eval",
+          "no-implied-eval",
+          "no-new-func",
+          "no-script-url",
+          "no-alert",
+          "no-console"
+        ],
+        "typescript": [
+          "@typescript-eslint/no-explicit-any",
+          "@typescript-eslint/no-unused-vars",
+          "@typescript-eslint/explicit-function-return-type",
+          "@typescript-eslint/no-non-null-assertion",
+          "@typescript-eslint/prefer-nullish-coalescing",
+          "@typescript-eslint/prefer-optional-chain"
+        ],
+        "react": [
+          "react-hooks/rules-of-hooks",
+          "react-hooks/exhaustive-deps",
+          "react/jsx-no-target-blank"
+        ],
+        "complexity": [
+          "complexity",
+          "max-depth",
+          "max-lines",
+          "max-lines-per-function",
+          "max-nested-callbacks",
+          "max-params",
+          "max-statements"
+        ]
+      },
+      "prettier": {
+        "semi": true,
+        "trailingComma": "es5",
+        "singleQuote": true,
+        "printWidth": 80,
+        "tabWidth": 2,
+        "useTabs": false
+      },
+      "sonar": {
+        "coverage": "Minimum 80% code coverage",
+        "duplications": "Maximum 3% code duplication",
+        "maintainability": "Maintainability rating A",
+        "reliability": "Reliability rating A",
+        "security": "Security rating A"
+      }
+    },
+    "testing": {
+      "unit": {
+        "coverage": "Minimum 80% code coverage",
+        "frameworks": ["Jest", "Testing Library"],
+        "patterns": ["AAA (Arrange, Act, Assert)", "Given-When-Then"],
+        "mocking": "Mock external dependencies",
+        "isolation": "Test units in isolation",
+        "timeout": "10 seconds maximum"
+      },
+      "integration": {
+        "apis": "Test all API endpoints",
+        "database": "Test database operations",
+        "mqtt": "Test MQTT connections",
+        "authentication": "Test auth flows",
+        "timeout": "30 seconds maximum"
+      },
+      "e2e": {
+        "framework": "Playwright",
+        "scenarios": [
+          "User registration and login",
+          "Printer connection and setup",
+          "Live data monitoring",
+          "Filament management",
+          "Print job creation and execution"
+        ],
+        "browsers": ["Chrome", "Firefox", "Safari"],
+        "mobile": "Test mobile responsiveness",
+        "timeout": "60 seconds maximum"
+      },
+      "security": {
+        "tools": ["OWASP ZAP", "Snyk", "npm audit", "ESLint security rules"],
+        "scans": [
+          "Dependency vulnerabilities",
+          "Code vulnerabilities",
+          "Infrastructure vulnerabilities",
+          "API security testing"
+        ],
+        "frequency": "Every commit, daily scans"
+      },
+      "performance": {
+        "frontend": {
+          "lighthouse": "Score > 90",
+          "firstContentfulPaint": "< 2s",
+          "largestContentfulPaint": "< 2.5s",
+          "cumulativeLayoutShift": "< 0.1"
+        },
+        "backend": {
+          "apiResponseTime": "< 200ms",
+          "databaseQueryTime": "< 100ms",
+          "mqttMessageProcessing": "< 50ms",
+          "memoryUsage": "< 512MB"
+        }
+      }
+    },
+    "documentation": {
+      "api": {
+        "openapi": "Generate OpenAPI 3.0 specification",
+        "examples": "Include request/response examples",
+        "errorCodes": "Document all error codes and messages",
+        "authentication": "Document authentication requirements",
+        "rateLimiting": "Document rate limiting information"
+      },
+      "code": {
+        "jsdoc": "Validate JSDoc comments",
+        "readme": "Maintain up-to-date README files",
+        "architecture": "Create architecture diagrams",
+        "deployment": "Document deployment procedures"
+      },
+      "user": {
+        "setup": "Create setup instructions",
+        "userGuide": "Generate user documentation",
+        "troubleshooting": "Create troubleshooting guides",
+        "faq": "Maintain FAQ section"
+      }
+    },
+    "deployment": {
+      "ci": {
+        "automation": "Automate CI/CD pipeline",
+        "testing": "Run all tests before deployment",
+        "security": "Run security scans",
+        "quality": "Check code quality gates"
+      },
+      "environments": {
+        "development": "Local development environment",
+        "staging": "Pre-production testing environment",
+        "production": "Live production environment"
+      },
+      "security": {
+        "secrets": "Secure environment variable management",
+        "ssl": "Enforce HTTPS in production",
+        "headers": "Implement security headers",
+        "monitoring": "Set up monitoring and alerting"
+      },
+      "rollback": {
+        "enabled": true,
+        "procedures": "Implement rollback procedures",
+        "testing": "Test rollback procedures regularly",
+        "documentation": "Document rollback steps"
+      }
+    }
+  },
+  "monitoring": {
+    "healthChecks": {
+      "database": "Check database connectivity",
+      "mqtt": "Check MQTT connection status",
+      "api": "Check API endpoint health",
+      "memory": "Monitor memory usage",
+      "disk": "Monitor disk space"
+    },
+    "alerts": {
+      "errorRate": "Alert if error rate > 1%",
+      "responseTime": "Alert if response time > 500ms",
+      "memoryUsage": "Alert if memory usage > 80%",
+      "diskSpace": "Alert if disk space < 20%",
+      "mqttDisconnect": "Alert on MQTT disconnection"
+    },
+    "metrics": {
+      "uptime": "Track system uptime",
+      "performance": "Track performance metrics",
+      "usage": "Track feature usage",
+      "errors": "Track error rates and types",
+      "security": "Track security events"
     }
   }
 }

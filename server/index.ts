@@ -12,11 +12,26 @@ import { auditLogger } from './middleware/auditLogger.js';
 import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
 import { printerRouter } from './routes/printers.js';
-import { filamentRouter } from './routes/filaments.js';
+import filamentRouter from './routes/filaments.js';
 import { printJobRouter } from './routes/printJobs.js';
+import { debugRouter } from './routes/debug.js';
+import { printerService } from './services/printerService.js';
+import { printJobService } from './services/printJobService.js';
+import { runMigrations } from './database/migrations.js';
+import { seedFilamentData } from './database/seedFilamentData.js';
+import { validateEnvironment } from './utils/envValidation.js';
 
 // Load environment variables
 dotenv.config();
+
+// Validate environment variables before starting (enterprise-grade security)
+try {
+  validateEnvironment();
+} catch (error) {
+  console.error('❌ Environment validation failed:', (error as Error).message);
+  console.error('Please check your .env file and ensure all required variables are set.');
+  process.exit(1);
+}
 
 const app = express();
 const logger = createLogger('server');
@@ -112,6 +127,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/printers', printerRouter);
 app.use('/api/filaments', filamentRouter);
 app.use('/api/print-jobs', printJobRouter);
+app.use('/api/debug', debugRouter); // Debug routes (authenticated)
 
 // Root route
 app.get('/', (req, res) => {
@@ -150,12 +166,55 @@ process.on('SIGINT', () => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   logger.info(`🚀 FilaPrint server running on port ${PORT}`);
   logger.info(`📊 Environment: ${process.env['NODE_ENV'] || 'development'}`);
   logger.info(
     `🔒 Security: ${process.env['NODE_ENV'] === 'production' ? 'enabled' : 'development mode'}`
   );
+
+  // Run database migrations
+  try {
+    await runMigrations();
+    logger.info('✅ Database migrations completed');
+  } catch (error) {
+    logger.error('❌ Database migrations failed', { error });
+  }
+
+  // Seed filament manufacturer and product data (only if empty)
+  try {
+    const { ManufacturerDB, FilamentProductDB } = await import('./database/filamentServices.js');
+    const manufacturers = await ManufacturerDB.findAll();
+    const products = await FilamentProductDB.findAll();
+    if (manufacturers.length === 0 || products.length === 0) {
+      logger.info('📦 Seeding filament manufacturer and product data...');
+      await seedFilamentData();
+      logger.info('✅ Filament data seeded successfully');
+    } else {
+      logger.info(`✅ Filament catalog already populated (${manufacturers.length} manufacturers, ${products.length} products)`);
+    }
+  } catch (error) {
+    logger.error('❌ Filament data seeding failed', { error });
+    // Don't exit - server can still run
+  }
+
+  // Load and auto-connect printers on startup
+  try {
+    await printerService.loadPrintersOnStartup();
+    logger.info('✅ Printer startup initialization completed');
+  } catch (error) {
+    logger.error('❌ Printer startup initialization failed', { error });
+    // Don't exit - server can still run
+  }
+
+  // Start print job service listener for automatic filament tracking
+  try {
+    printJobService.startListening();
+    logger.info('✅ Print job service started - automatic filament tracking enabled');
+  } catch (error) {
+    logger.error('❌ Print job service initialization failed', { error });
+    // Don't exit - server can still run
+  }
 });
 
 export default app;

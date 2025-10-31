@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { logAuthEvent } from '../middleware/auditLogger.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('auth-routes');
 import {
   authService,
   CreateUserData,
@@ -142,6 +145,11 @@ router.get(
   authenticate,
   asyncHandler(async (req, res) => {
     if (!req.user || !req.user.userId) {
+      logger.warn('Auth /me called without valid user', {
+        hasUser: !!req.user,
+        userId: req.user?.userId,
+        ip: req.ip,
+      });
       return res.status(401).json({
         success: false,
         error: {
@@ -153,24 +161,37 @@ router.get(
       });
     }
 
-    const user = await authService.getUserById(req.user.userId);
+    try {
+      const user = await authService.getUserById(req.user.userId);
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          code: 'USER_NOT_FOUND',
-          message: 'User not found',
-          timestamp: new Date().toISOString(),
-          requestId: req.headers['x-request-id'],
-        },
+      if (!user) {
+        logger.warn('User not found in /me endpoint', {
+          userId: req.user.userId,
+          ip: req.ip,
+        });
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'USER_NOT_FOUND',
+            message: 'User not found',
+            timestamp: new Date().toISOString(),
+            requestId: req.headers['x-request-id'],
+          },
+        });
+      }
+
+      res.json({
+        success: true,
+        data: user,
       });
+    } catch (error) {
+      logger.error('Error in /me endpoint', {
+        error: error instanceof Error ? error.message : error,
+        userId: req.user?.userId,
+        ip: req.ip,
+      });
+      throw error; // Let errorHandler middleware handle it
     }
-
-    res.json({
-      success: true,
-      data: user,
-    });
   })
 );
 
